@@ -1,22 +1,42 @@
 from flask import Flask, render_template, request, redirect, session, url_for
+import sqlite3
 
 app = Flask(__name__)
 app.secret_key = "chave_super_secreta"
 
-# LOGIN FIXO
+DB = "database.db"
+
+# ---------------- BANCO ----------------
+def init_db():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS agendamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        data TEXT,
+        hora TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ---------- LOGIN FIXO ----------
 USUARIO = "admin@ronamy.com"
 SENHA = "123"
 
-# BANCO SIMPLES EM MEMÓRIA
-agendamentos = []
-
-# ---------- LOGIN ----------
+# ---------- HOME ----------
 @app.route("/")
 def home():
     if "logado" in session:
         return redirect(url_for("painel"))
     return redirect(url_for("login"))
 
+# ---------- LOGIN ----------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = None
@@ -39,9 +59,17 @@ def painel():
     if "logado" not in session:
         return redirect(url_for("login"))
 
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    c.execute("SELECT id, nome, data, hora FROM agendamentos ORDER BY id DESC")
+    agendamentos = c.fetchall()
+
+    conn.close()
+
     return render_template("painel.html", agendamentos=agendamentos)
 
-# ---------- NOVO AGENDAMENTO ----------
+# ---------- AGENDAR ----------
 @app.route("/agendar", methods=["POST"])
 def agendar():
     if "logado" not in session:
@@ -51,11 +79,16 @@ def agendar():
     data = request.form.get("data")
     hora = request.form.get("hora")
 
-    agendamentos.append({
-        "nome": nome,
-        "data": data,
-        "hora": hora
-    })
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO agendamentos (nome, data, hora)
+    VALUES (?, ?, ?)
+    """, (nome, data, hora))
+
+    conn.commit()
+    conn.close()
 
     return redirect(url_for("painel"))
 
