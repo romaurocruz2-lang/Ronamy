@@ -1,3 +1,7 @@
-flask==3.0.3
-bcrypt==4.1.3
-gunicorn==22.0.0
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Ronamy funcionando!"
