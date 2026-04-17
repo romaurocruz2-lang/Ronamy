@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Painel Agenda</title>
+</head>
+<body>
+
+<h1>Painel de Agendamentos</h1>
+
+<a href="/logout">Sair</a>
+
+<hr>
+
+<h2>Novo Agendamento</h2>
+
+<form method="POST" action="/agendar">
+  <input type="text" name="nome" placeholder="Nome do cliente" required>
+  <br><br>
+
+  <input type="date" name="data" required>
+  <br><br>
+
+  <input type="time" name="hora" required>
+  <br><br>
+
+  <button type="submit">Agendar</button>
+</form>
+
+<hr>
+
+<h2>Agendamentos</h2>
+
+{% for a in agendamentos %}
+  <p>
+    👤 {{ a.nome }} | 📅 {{ a.data }} | ⏰ {{ a.hora }}
+  </p>
+{% else %}
+  <p>Nenhum agendamento ainda.</p>
+{% endfor %}
+
+</body>
+</html>
