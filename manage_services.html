@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ronamy — Agende seu Horário</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">
+    <div class="logo-icon">R</div>
+    <div class="logo-text">
+      <h1>Ronamy</h1>
+      <span>Beleza que transforma</span>
+    </div>
+  </div>
+  <nav class="header-nav">
+    <a href="/admin/login">Área Admin</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h2>Agende seu <span>horário</span></h2>
+  <div class="gold-line"></div>
+  <p>Beleza que transforma sua autoestima</p>
+</section>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-wrap">
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main class="booking-section">
+  <form method="POST" action="/agendar" id="booking-form">
+
+    <!-- STEP 1: PROFISSIONAL -->
+    <div class="step-title">
+      <div class="step-num">1</div>
+      <h3>Escolha a profissional</h3>
+    </div>
+    <div class="prof-grid">
+      {% for p in professionals %}
+      <label class="prof-card" for="prof_{{ p.id }}" onclick="selectProf({{ p.id }})">
+        <input type="radio" name="profissional_id" id="prof_{{ p.id }}" value="{{ p.id }}" class="prof-radio" required />
+        <div class="prof-avatar">{{ p.nome[0] }}</div>
+        <div class="prof-name">{{ p.nome }}</div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <hr class="section-divider" />
+
+    <!-- STEP 2: SERVIÇO -->
+    <div class="step-title">
+      <div class="step-num">2</div>
+      <h3>Selecione o serviço</h3>
+    </div>
+    <div class="svc-grid">
+      {% for s in services %}
+      <label class="svc-card" for="svc_{{ s.id }}">
+        <input type="radio" name="servico_id" id="svc_{{ s.id }}" value="{{ s.id }}" class="svc-radio" required />
+        <div class="svc-name">{{ s.nome }}</div>
+        <div class="svc-meta">
+          <span class="svc-price">R$ {{ "%.0f"|format(s.preco) }}</span>
+          <span class="svc-dur">
+            {% if s.duracao_min < 60 %}{{ s.duracao_min }}min{% elif s.duracao_min == 60 %}1h{% else %}{{ s.duracao_min // 60 }}h{% if s.duracao_min % 60 %}{{ s.duracao_min % 60 }}min{% endif %}{% endif %}
+          </span>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <hr class="section-divider" />
+
+    <!-- STEP 3: DATA E HORA -->
+    <div class="step-title">
+      <div class="step-num">3</div>
+      <h3>Escolha a data e horário</h3>
+    </div>
+    <div class="datetime-grid">
+      <div class="form-group">
+        <label for="data">Data</label>
+        <input type="date" id="data" name="data" required min="{{ today }}" onchange="loadSlots()" />
+      </div>
+      <div class="form-group">
+        <label>Horário disponível</label>
+        <div id="slots-area">
+          <div id="slots-msg">Selecione uma profissional e uma data.</div>
+          <div class="slots-container" id="slots-container" style="display:none;"></div>
+          <input type="hidden" name="hora" id="hora-input" required />
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-divider" />
+
+    <!-- STEP 4: DADOS DO CLIENTE -->
+    <div class="step-title">
+      <div class="step-num">4</div>
+      <h3>Seus dados</h3>
+    </div>
+    <div class="fields-grid">
+      <div class="form-group">
+        <label for="nome">Nome completo</label>
+        <input type="text" id="nome" name="nome" placeholder="Ex: Maria Silva" required />
+      </div>
+      <div class="form-group">
+        <label for="whatsapp">WhatsApp</label>
+        <input type="tel" id="whatsapp" name="whatsapp" placeholder="(11) 99999-9999" required />
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="btn btn-gold" style="min-width:260px;">
+        ✦ Confirmar Agendamento
+      </button>
+    </div>
+
+  </form>
+</main>
+
+<footer class="site-footer">
+  © 2024 Ronamy — Beleza que transforma sua autoestima
+</footer>
+
+<script>
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('data').min = today;
+
+  let selectedProfId = null;
+
+  function selectProf(id) {
+    selectedProfId = id;
+    document.querySelectorAll('.prof-card').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`label[for="prof_${id}"]`).classList.add('selected');
+    loadSlots();
+  }
+
+  function selectSvc(id) {
+    document.querySelectorAll('.svc-card').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`label[for="svc_${id}"]`).classList.add('selected');
+  }
+
+  document.querySelectorAll('.svc-radio').forEach(r => {
+    r.addEventListener('change', () => selectSvc(r.value));
+  });
+
+  function loadSlots() {
+    const data = document.getElementById('data').value;
+    if (!selectedProfId || !data) return;
+
+    document.getElementById('slots-msg').textContent = 'Carregando horários...';
+    document.getElementById('slots-msg').style.display = 'block';
+    document.getElementById('slots-container').style.display = 'none';
+    document.getElementById('hora-input').value = '';
+
+    fetch(`/get-slots?profissional_id=${selectedProfId}&data=${data}`)
+      .then(r => r.json())
+      .then(data => {
+        const container = document.getElementById('slots-container');
+        container.innerHTML = '';
+
+        if (!data.slots || data.slots.length === 0) {
+          document.getElementById('slots-msg').textContent = 'Nenhum horário disponível.';
+          return;
+        }
+
+        document.getElementById('slots-msg').style.display = 'none';
+        container.style.display = 'grid';
+
+        data.slots.forEach(s => {
+          const btn = document.createElement('div');
+          btn.className = 'slot-btn';
+          btn.textContent = s.hora;
+
+          if (s.status === 'ocupado' || s.status === 'passado') {
+            btn.classList.add(s.status === 'ocupado' ? 'occupied' : 'past');
+          } else {
+            btn.addEventListener('click', () => {
+              document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+              btn.classList.add('selected');
+              document.getElementById('hora-input').value = s.hora;
+            });
+          }
+          container.appendChild(btn);
+        });
+      })
+      .catch(() => {
+        document.getElementById('slots-msg').textContent = 'Erro ao carregar horários.';
+      });
+  }
+</script>
+</body>
+</html>

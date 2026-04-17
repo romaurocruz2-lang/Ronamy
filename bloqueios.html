@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ronamy — Admin Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="login-logo">Ronamy</div>
+    <div class="login-sub">Área Administrativa</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}" style="margin-bottom:16px;text-align:left;">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/admin/login">
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" name="email" placeholder="admin@ronamy.com" required autofocus />
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" name="senha" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn btn-gold btn-full" style="margin-top:10px;">Entrar</button>
+    </form>
+
+    <div style="margin-top:20px;">
+      <a href="/" style="font-size:13px;color:var(--gray);">← Voltar ao site</a>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

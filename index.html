@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ronamy — Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+<div class="admin-layout">
+
+  {% include 'sidebar.html' %}
+
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <div class="page-title">Dashboard</div>
+      <a href="/" class="btn btn-outline btn-sm" target="_blank">Ver site →</a>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- STATS -->
+      <div class="stats-row">
+        <div class="stat-card gold-card">
+          <div class="stat-label">Total de Agendamentos</div>
+          <div class="stat-val">{{ total }}</div>
+          <div class="stat-sub">Todos os períodos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Agendamentos Hoje</div>
+          <div class="stat-val">{{ hoje_count }}</div>
+          <div class="stat-sub">{{ hoje }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cancelados</div>
+          <div class="stat-val">{{ cancelados }}</div>
+          <div class="stat-sub">Total histórico</div>
+        </div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="charts-row">
+
+        <div class="chart-card">
+          <h3>Atendimentos por profissional</h3>
+          <div style="position:relative;height:220px;">
+            <canvas id="chartProf" aria-label="Atendimentos por profissional"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>Agendamentos — últimos 7 dias</h3>
+          <div style="position:relative;height:220px;">
+            <canvas id="chartDias" aria-label="Agendamentos por dia"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RANKING TABLE -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Ranking de profissionais</h3>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Profissional</th>
+              <th>Atendimentos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in por_prof %}
+            <tr>
+              <td>
+                {% if loop.index == 1 %}<span class="badge badge-gold">1º</span>
+                {% elif loop.index == 2 %}<span class="badge badge-gray">2º</span>
+                {% else %}<span style="color:var(--gray);">{{ loop.index }}º</span>{% endif %}
+              </td>
+              <td>{{ p.nome }}</td>
+              <td><strong style="color:var(--gold);">{{ p.total }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const GOLD = '#C9A84C';
+const GOLD2 = '#9A7A2E';
+const WHITE = '#FFFFFF';
+const GRAY = '#555555';
+
+const profLabels = {{ por_prof | map(attribute='nome') | list | tojson }};
+const profData   = {{ por_prof | map(attribute='total') | list | tojson }};
+
+new Chart(document.getElementById('chartProf'), {
+  type: 'bar',
+  data: {
+    labels: profLabels,
+    datasets: [{
+      label: 'Atendimentos',
+      data: profData,
+      backgroundColor: profLabels.map((_, i) => i === 0 ? GOLD : GOLD2),
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: GRAY, precision: 0 } },
+      x: { grid: { display: false }, ticks: { color: WHITE, font: { size: 12 } } }
+    }
+  }
+});
+
+const diasLabels = {{ ultimos_7 | map(attribute='data') | list | tojson }};
+const diasData   = {{ ultimos_7 | map(attribute='count') | list | tojson }};
+
+new Chart(document.getElementById('chartDias'), {
+  type: 'line',
+  data: {
+    labels: diasLabels,
+    datasets: [{
+      label: 'Agendamentos',
+      data: diasData,
+      borderColor: GOLD,
+      backgroundColor: 'rgba(201,168,76,0.1)',
+      borderWidth: 2,
+      pointBackgroundColor: GOLD,
+      pointRadius: 4,
+      fill: true,
+      tension: 0.4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: GRAY, precision: 0 } },
+      x: { grid: { display: false }, ticks: { color: WHITE, font: { size: 12 } } }
+    }
+  }
+});
+</script>
+</body>
+</html>

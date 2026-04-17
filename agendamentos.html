@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ronamy — Bloquear Horários</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+<div class="admin-layout">
+  {% include 'sidebar.html' %}
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <div class="page-title">Bloquear Horários</div>
+    </div>
+    <div class="admin-content">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}
+          <div class="flash {{ cat }}" style="margin-bottom:16px;">{{ msg }}</div>
+        {% endfor %}{% endif %}
+      {% endwith %}
+
+      <form method="POST" action="/admin/bloqueios">
+        <div class="form-card">
+          <h3>Adicionar bloqueio</h3>
+          <div class="fields-grid">
+            <div class="form-group">
+              <label>Profissional (vazio = todas)</label>
+              <select name="profissional_id">
+                <option value="">Todas as profissionais</option>
+                {% for p in professionals %}
+                  <option value="{{ p.id }}">{{ p.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Data</label>
+              <input type="date" name="data" required />
+            </div>
+            <div class="form-group">
+              <label>Horário</label>
+              <select name="hora" required>
+                <option value="">Selecione...</option>
+                {% for s in slots %}
+                  <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Motivo (opcional)</label>
+              <input type="text" name="motivo" placeholder="Ex: Folga, Feriado..." />
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <button type="submit" class="btn btn-gold">Bloquear Horário</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Horários bloqueados ({{ blocos | length }})</h3>
+        </div>
+        {% if blocos %}
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Profissional</th>
+              <th>Data</th>
+              <th>Hora</th>
+              <th>Motivo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in blocos %}
+            <tr>
+              <td>{{ b.prof_nome or 'Todas' }}</td>
+              <td>{{ b.data }}</td>
+              <td>{{ b.hora }}</td>
+              <td>{{ b.motivo or '—' }}</td>
+              <td>
+                <form method="POST" action="/admin/bloqueios/remover/{{ b.id }}"
+                      onsubmit="return confirm('Remover este bloqueio?')">
+                  <button type="submit" class="btn btn-danger">Remover</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-state">Nenhum horário bloqueado.</div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

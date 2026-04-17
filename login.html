@@ -1,0 +1,493 @@
+import os
+import sqlite3
+from datetime import datetime, timedelta
+from functools import wraps
+
+import bcrypt
+from flask import (Flask, flash, g, redirect, render_template, request,
+                   session, url_for)
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "ronamy-secret-2024-change-in-production")
+
+DATABASE = "ronamy.db"
+
+
+def get_db():
+    db = getattr(g, "_database", None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+    return db
+
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, "_database", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS professionals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            ativo INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS services (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            preco REAL NOT NULL,
+            duracao_min INTEGER NOT NULL,
+            ativo INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS appointments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            whatsapp TEXT NOT NULL,
+            profissional_id INTEGER NOT NULL,
+            servico_id INTEGER NOT NULL,
+            data TEXT NOT NULL,
+            hora TEXT NOT NULL,
+            status TEXT DEFAULT 'confirmado',
+            criado_em TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (profissional_id) REFERENCES professionals(id),
+            FOREIGN KEY (servico_id) REFERENCES services(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS blocked_slots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profissional_id INTEGER,
+            data TEXT NOT NULL,
+            hora TEXT NOT NULL,
+            motivo TEXT,
+            FOREIGN KEY (profissional_id) REFERENCES professionals(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS admin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            senha_hash TEXT NOT NULL
+        );
+    """)
+    db.commit()
+
+    profs = db.execute("SELECT COUNT(*) as c FROM professionals").fetchone()["c"]
+    if profs == 0:
+        for nome in ["Larissa Magna", "Selvina", "Ronamy"]:
+            db.execute("INSERT INTO professionals (nome) VALUES (?)", (nome,))
+
+    svcs = db.execute("SELECT COUNT(*) as c FROM services").fetchone()["c"]
+    if svcs == 0:
+        initial = [
+            ("Corte feminino", 50.0, 30),
+            ("Escova", 40.0, 30),
+            ("Hidratação", 60.0, 40),
+            ("Progressiva", 150.0, 120),
+            ("Alisamento", 120.0, 90),
+            ("Corte + Escova", 80.0, 60),
+        ]
+        for nome, preco, dur in initial:
+            db.execute("INSERT INTO services (nome, preco, duracao_min) VALUES (?,?,?)", (nome, preco, dur))
+
+    admin_count = db.execute("SELECT COUNT(*) as c FROM admin").fetchone()["c"]
+    if admin_count == 0:
+        hashed = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
+        db.execute("INSERT INTO admin (email, senha_hash) VALUES (?, ?)", ("admin@ronamy.com", hashed))
+
+    db.commit()
+    db.close()
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("admin_logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def generate_slots():
+    slots = []
+    start = datetime.strptime("08:00", "%H:%M")
+    end = datetime.strptime("18:00", "%H:%M")
+    current = start
+    while current <= end:
+        slots.append(current.strftime("%H:%M"))
+        current += timedelta(minutes=30)
+    return slots
+
+
+def get_available_slots(profissional_id, data):
+    db = get_db()
+    all_slots = generate_slots()
+
+    booked = db.execute(
+        "SELECT hora FROM appointments WHERE profissional_id=? AND data=? AND status!='cancelado'",
+        (profissional_id, data)
+    ).fetchall()
+    booked_times = {r["hora"] for r in booked}
+
+    blocked = db.execute(
+        "SELECT hora FROM blocked_slots WHERE (profissional_id=? OR profissional_id IS NULL) AND data=?",
+        (profissional_id, data)
+    ).fetchall()
+    blocked_times = {r["hora"] for r in blocked}
+
+    occupied = booked_times | blocked_times
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    now_time = datetime.now().strftime("%H:%M")
+
+    result = []
+    for s in all_slots:
+        status = "disponivel"
+        if s in occupied:
+            status = "ocupado"
+        elif data == today and s <= now_time:
+            status = "passado"
+        result.append({"hora": s, "status": status})
+    return result
+
+
+# ───────────────────────────── PUBLIC ROUTES ─────────────────────────────
+
+@app.route("/")
+def index():
+    db = get_db()
+    professionals = db.execute("SELECT * FROM professionals WHERE ativo=1 ORDER BY nome").fetchall()
+    services = db.execute("SELECT * FROM services WHERE ativo=1 ORDER BY nome").fetchall()
+    return render_template("index.html", professionals=professionals, services=services)
+
+
+@app.route("/get-slots")
+def get_slots():
+    prof_id = request.args.get("profissional_id")
+    data = request.args.get("data")
+    if not prof_id or not data:
+        return {"slots": []}
+    slots = get_available_slots(prof_id, data)
+    return {"slots": slots}
+
+
+@app.route("/agendar", methods=["POST"])
+def agendar():
+    try:
+        nome = request.form.get("nome", "").strip()
+        whatsapp = request.form.get("whatsapp", "").strip()
+        profissional_id = request.form.get("profissional_id", "").strip()
+        servico_id = request.form.get("servico_id", "").strip()
+        data = request.form.get("data", "").strip()
+        hora = request.form.get("hora", "").strip()
+
+        if not all([nome, whatsapp, profissional_id, servico_id, data, hora]):
+            flash("Preencha todos os campos obrigatórios.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+
+        existing = db.execute(
+            "SELECT id FROM appointments WHERE profissional_id=? AND data=? AND hora=? AND status!='cancelado'",
+            (profissional_id, data, hora)
+        ).fetchone()
+        if existing:
+            flash("Horário indisponível, escolha outro.", "error")
+            return redirect(url_for("index"))
+
+        blocked = db.execute(
+            "SELECT id FROM blocked_slots WHERE (profissional_id=? OR profissional_id IS NULL) AND data=? AND hora=?",
+            (profissional_id, data, hora)
+        ).fetchone()
+        if blocked:
+            flash("Horário indisponível, escolha outro.", "error")
+            return redirect(url_for("index"))
+
+        db.execute(
+            "INSERT INTO appointments (nome, whatsapp, profissional_id, servico_id, data, hora) VALUES (?,?,?,?,?,?)",
+            (nome, whatsapp, profissional_id, servico_id, data, hora)
+        )
+        db.commit()
+
+        prof = db.execute("SELECT nome FROM professionals WHERE id=?", (profissional_id,)).fetchone()
+        svc = db.execute("SELECT nome, preco FROM services WHERE id=?", (servico_id,)).fetchone()
+
+        data_fmt = datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
+        wpp_msg = (
+            f"Olá! Gostaria de confirmar meu agendamento no salão Ronamy.\n"
+            f"Nome: {nome}\nProfissional: {prof['nome']}\n"
+            f"Serviço: {svc['nome']}\nData: {data_fmt}\nHorário: {hora}"
+        )
+
+        return render_template("success.html",
+            nome=nome,
+            profissional=prof["nome"],
+            servico=svc["nome"],
+            preco=svc["preco"],
+            data=data_fmt,
+            hora=hora,
+            whatsapp=whatsapp,
+            wpp_msg=wpp_msg
+        )
+    except Exception as e:
+        flash("Erro ao realizar agendamento. Tente novamente.", "error")
+        return redirect(url_for("index"))
+
+
+# ───────────────────────────── ADMIN AUTH ─────────────────────────────
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def login():
+    if session.get("admin_logged_in"):
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        senha = request.form.get("senha", "").strip()
+        if not email or not senha:
+            flash("Preencha email e senha.", "error")
+            return render_template("login.html")
+        db = get_db()
+        admin = db.execute("SELECT * FROM admin WHERE email=?", (email,)).fetchone()
+        if admin and bcrypt.checkpw(senha.encode(), admin["senha_hash"].encode()):
+            session["admin_logged_in"] = True
+            session["admin_email"] = email
+            return redirect(url_for("dashboard"))
+        flash("Email ou senha incorretos.", "error")
+    return render_template("login.html")
+
+
+@app.route("/admin/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ───────────────────────────── ADMIN DASHBOARD ─────────────────────────────
+
+@app.route("/admin")
+@login_required
+def dashboard():
+    db = get_db()
+    total = db.execute("SELECT COUNT(*) as c FROM appointments WHERE status!='cancelado'").fetchone()["c"]
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    hoje_count = db.execute("SELECT COUNT(*) as c FROM appointments WHERE data=? AND status!='cancelado'", (hoje,)).fetchone()["c"]
+    cancelados = db.execute("SELECT COUNT(*) as c FROM appointments WHERE status='cancelado'").fetchone()["c"]
+
+    por_prof = db.execute("""
+        SELECT p.nome, COUNT(a.id) as total
+        FROM professionals p
+        LEFT JOIN appointments a ON a.profissional_id = p.id AND a.status != 'cancelado'
+        WHERE p.ativo = 1
+        GROUP BY p.id ORDER BY total DESC
+    """).fetchall()
+
+    ultimos_7 = []
+    for i in range(6, -1, -1):
+        d = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        c = db.execute("SELECT COUNT(*) as c FROM appointments WHERE data=? AND status!='cancelado'", (d,)).fetchone()["c"]
+        ultimos_7.append({"data": datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m"), "count": c})
+
+    return render_template("dashboard.html",
+        total=total, hoje_count=hoje_count, cancelados=cancelados,
+        por_prof=por_prof, ultimos_7=ultimos_7
+    )
+
+
+@app.route("/admin/agendamentos")
+@login_required
+def agendamentos():
+    db = get_db()
+    prof_filter = request.args.get("profissional_id", "")
+    professionals = db.execute("SELECT * FROM professionals WHERE ativo=1 ORDER BY nome").fetchall()
+
+    query = """
+        SELECT a.*, p.nome as prof_nome, s.nome as svc_nome, s.preco
+        FROM appointments a
+        JOIN professionals p ON p.id = a.profissional_id
+        JOIN services s ON s.id = a.servico_id
+    """
+    params = []
+    if prof_filter:
+        query += " WHERE a.profissional_id = ?"
+        params.append(prof_filter)
+    query += " ORDER BY a.data DESC, a.hora DESC"
+
+    appts = db.execute(query, params).fetchall()
+    return render_template("agendamentos.html", appts=appts, professionals=professionals, prof_filter=prof_filter)
+
+
+@app.route("/admin/agendamentos/cancelar/<int:appt_id>", methods=["POST"])
+@login_required
+def cancelar_agendamento(appt_id):
+    db = get_db()
+    db.execute("UPDATE appointments SET status='cancelado' WHERE id=?", (appt_id,))
+    db.commit()
+    flash("Agendamento cancelado.", "success")
+    return redirect(url_for("agendamentos"))
+
+
+@app.route("/admin/agendamentos/status/<int:appt_id>", methods=["POST"])
+@login_required
+def alterar_status(appt_id):
+    novo_status = request.form.get("status")
+    if novo_status in ["confirmado", "concluido", "cancelado", "pendente"]:
+        db = get_db()
+        db.execute("UPDATE appointments SET status=? WHERE id=?", (novo_status, appt_id))
+        db.commit()
+        flash("Status atualizado.", "success")
+    return redirect(url_for("agendamentos"))
+
+
+@app.route("/admin/agendar-manual", methods=["GET", "POST"])
+@login_required
+def agendar_manual():
+    db = get_db()
+    professionals = db.execute("SELECT * FROM professionals WHERE ativo=1 ORDER BY nome").fetchall()
+    services = db.execute("SELECT * FROM services WHERE ativo=1 ORDER BY nome").fetchall()
+    if request.method == "POST":
+        try:
+            nome = request.form.get("nome", "").strip()
+            whatsapp = request.form.get("whatsapp", "").strip()
+            profissional_id = request.form.get("profissional_id")
+            servico_id = request.form.get("servico_id")
+            data = request.form.get("data")
+            hora = request.form.get("hora")
+            if not all([nome, whatsapp, profissional_id, servico_id, data, hora]):
+                flash("Preencha todos os campos.", "error")
+            else:
+                existing = db.execute(
+                    "SELECT id FROM appointments WHERE profissional_id=? AND data=? AND hora=? AND status!='cancelado'",
+                    (profissional_id, data, hora)
+                ).fetchone()
+                if existing:
+                    flash("Horário já ocupado.", "error")
+                else:
+                    db.execute(
+                        "INSERT INTO appointments (nome, whatsapp, profissional_id, servico_id, data, hora) VALUES (?,?,?,?,?,?)",
+                        (nome, whatsapp, profissional_id, servico_id, data, hora)
+                    )
+                    db.commit()
+                    flash("Agendamento criado com sucesso!", "success")
+                    return redirect(url_for("agendamentos"))
+        except Exception:
+            flash("Erro ao criar agendamento.", "error")
+    return render_template("agendar_manual.html", professionals=professionals, services=services, slots=generate_slots())
+
+
+# ───────────────────────────── BLOCKED SLOTS ─────────────────────────────
+
+@app.route("/admin/bloqueios", methods=["GET", "POST"])
+@login_required
+def bloqueios():
+    db = get_db()
+    professionals = db.execute("SELECT * FROM professionals WHERE ativo=1 ORDER BY nome").fetchall()
+    if request.method == "POST":
+        prof_id = request.form.get("profissional_id") or None
+        data = request.form.get("data")
+        hora = request.form.get("hora")
+        motivo = request.form.get("motivo", "").strip()
+        if data and hora:
+            db.execute("INSERT INTO blocked_slots (profissional_id, data, hora, motivo) VALUES (?,?,?,?)",
+                       (prof_id, data, hora, motivo))
+            db.commit()
+            flash("Horário bloqueado com sucesso.", "success")
+        else:
+            flash("Preencha data e hora.", "error")
+
+    blocos = db.execute("""
+        SELECT b.*, p.nome as prof_nome FROM blocked_slots b
+        LEFT JOIN professionals p ON p.id = b.profissional_id
+        ORDER BY b.data DESC, b.hora
+    """).fetchall()
+    return render_template("bloqueios.html", professionals=professionals, slots=generate_slots(), blocos=blocos)
+
+
+@app.route("/admin/bloqueios/remover/<int:bid>", methods=["POST"])
+@login_required
+def remover_bloqueio(bid):
+    db = get_db()
+    db.execute("DELETE FROM blocked_slots WHERE id=?", (bid,))
+    db.commit()
+    flash("Bloqueio removido.", "success")
+    return redirect(url_for("bloqueios"))
+
+
+# ───────────────────────────── SERVICES ─────────────────────────────
+
+@app.route("/admin/servicos", methods=["GET", "POST"])
+@login_required
+def manage_services():
+    db = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        try:
+            if action == "add":
+                nome = request.form.get("nome", "").strip()
+                preco = float(request.form.get("preco", 0))
+                dur = int(request.form.get("duracao_min", 30))
+                if nome and preco > 0:
+                    db.execute("INSERT INTO services (nome, preco, duracao_min) VALUES (?,?,?)", (nome, preco, dur))
+                    db.commit()
+                    flash("Serviço adicionado.", "success")
+                else:
+                    flash("Preencha todos os campos.", "error")
+            elif action == "edit":
+                sid = request.form.get("id")
+                preco = float(request.form.get("preco", 0))
+                dur = int(request.form.get("duracao_min", 30))
+                nome = request.form.get("nome", "").strip()
+                db.execute("UPDATE services SET nome=?, preco=?, duracao_min=? WHERE id=?", (nome, preco, dur, sid))
+                db.commit()
+                flash("Serviço atualizado.", "success")
+            elif action == "delete":
+                sid = request.form.get("id")
+                db.execute("UPDATE services SET ativo=0 WHERE id=?", (sid,))
+                db.commit()
+                flash("Serviço removido.", "success")
+        except Exception:
+            flash("Erro ao processar serviço.", "error")
+
+    services = db.execute("SELECT * FROM services WHERE ativo=1 ORDER BY nome").fetchall()
+    return render_template("manage_services.html", services=services)
+
+
+# ───────────────────────────── PROFESSIONALS ─────────────────────────────
+
+@app.route("/admin/profissionais", methods=["GET", "POST"])
+@login_required
+def manage_professionals():
+    db = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        try:
+            if action == "add":
+                nome = request.form.get("nome", "").strip()
+                if nome:
+                    db.execute("INSERT INTO professionals (nome) VALUES (?)", (nome,))
+                    db.commit()
+                    flash("Profissional adicionada.", "success")
+                else:
+                    flash("Informe o nome.", "error")
+            elif action == "delete":
+                pid = request.form.get("id")
+                db.execute("UPDATE professionals SET ativo=0 WHERE id=?", (pid,))
+                db.commit()
+                flash("Profissional removida.", "success")
+        except Exception:
+            flash("Erro ao processar.", "error")
+
+    professionals = db.execute("SELECT * FROM professionals WHERE ativo=1 ORDER BY nome").fetchall()
+    return render_template("manage_professionals.html", professionals=professionals)
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=False)
+
+with app.app_context():
+    init_db()

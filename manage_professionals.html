@@ -1,0 +1,33 @@
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="name">Ronamy</div>
+    <div class="sub">Painel Admin</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <a href="/admin" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon">◈</span> Dashboard
+    </a>
+    <a href="/admin/agendamentos" class="nav-item {% if request.endpoint == 'agendamentos' %}active{% endif %}">
+      <span class="nav-icon">◷</span> Agendamentos
+    </a>
+    <a href="/admin/agendar-manual" class="nav-item {% if request.endpoint == 'agendar_manual' %}active{% endif %}">
+      <span class="nav-icon">✚</span> Novo Agendamento
+    </a>
+    <div class="nav-section">Gerenciar</div>
+    <a href="/admin/servicos" class="nav-item {% if request.endpoint == 'manage_services' %}active{% endif %}">
+      <span class="nav-icon">✦</span> Serviços
+    </a>
+    <a href="/admin/profissionais" class="nav-item {% if request.endpoint == 'manage_professionals' %}active{% endif %}">
+      <span class="nav-icon">◉</span> Profissionais
+    </a>
+    <a href="/admin/bloqueios" class="nav-item {% if request.endpoint == 'bloqueios' %}active{% endif %}">
+      <span class="nav-icon">⊘</span> Bloquear Horários
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/admin/logout" class="nav-item" style="color:#ef9a9a;">
+      <span class="nav-icon">↩</span> Sair
+    </a>
+  </div>
+</div>

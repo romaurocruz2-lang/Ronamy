@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ronamy — Novo Agendamento</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+<div class="admin-layout">
+  {% include 'sidebar.html' %}
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <div class="page-title">Novo Agendamento Manual</div>
+    </div>
+    <div class="admin-content">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}
+          <div class="flash {{ cat }}" style="margin-bottom:16px;">{{ msg }}</div>
+        {% endfor %}{% endif %}
+      {% endwith %}
+
+      <form method="POST" action="/admin/agendar-manual">
+        <div class="form-card">
+          <h3>Dados do cliente</h3>
+          <div class="fields-grid">
+            <div class="form-group">
+              <label>Nome completo</label>
+              <input type="text" name="nome" placeholder="Nome do cliente" required />
+            </div>
+            <div class="form-group">
+              <label>WhatsApp</label>
+              <input type="tel" name="whatsapp" placeholder="(11) 99999-9999" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>Agendamento</h3>
+          <div class="fields-grid">
+            <div class="form-group">
+              <label>Profissional</label>
+              <select name="profissional_id" required>
+                <option value="">Selecione...</option>
+                {% for p in professionals %}
+                  <option value="{{ p.id }}">{{ p.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Serviço</label>
+              <select name="servico_id" required>
+                <option value="">Selecione...</option>
+                {% for s in services %}
+                  <option value="{{ s.id }}">{{ s.nome }} — R$ {{ "%.0f"|format(s.preco) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Data</label>
+              <input type="date" name="data" required />
+            </div>
+            <div class="form-group">
+              <label>Horário</label>
+              <select name="hora" required>
+                <option value="">Selecione...</option>
+                {% for slot in slots %}
+                  <option value="{{ slot }}">{{ slot }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <button type="submit" class="btn btn-gold">Criar Agendamento</button>
+            <a href="/admin/agendamentos" class="btn btn-outline" style="margin-left:10px;">Cancelar</a>
+          </div>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
