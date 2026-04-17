@@ -79,6 +79,9 @@ def agendar():
     data = request.form.get("data")
     hora = request.form.get("hora")
 
+    if not nome or not data or not hora:
+        return redirect(url_for("painel"))
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
 
