@@ -1,42 +1,128 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <title>Painel Agenda</title>
+<meta charset="UTF-8">
+<title>Painel Admin</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0d0d0d;
+  color: white;
+}
+
+.sidebar {
+  width: 240px;
+  height: 100vh;
+  position: fixed;
+  background: #111;
+  padding: 20px;
+}
+
+.sidebar h2 {
+  color: gold;
+  margin-bottom: 30px;
+}
+
+.sidebar a {
+  display: block;
+  color: #ccc;
+  padding: 10px;
+  text-decoration: none;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+.sidebar a:hover {
+  background: gold;
+  color: black;
+}
+
+.main {
+  margin-left: 260px;
+  padding: 20px;
+}
+
+.card {
+  background: #1c1c1c;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.05);
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #333;
+  text-align: left;
+}
+
+th {
+  color: gold;
+}
+
+.badge {
+  background: gold;
+  color: black;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+</style>
+
 </head>
+
 <body>
 
-<h1>Painel de Agendamentos</h1>
+<div class="sidebar">
+  <h2>RONAMY</h2>
+  <a href="/painel">📊 Dashboard</a>
+  <a href="/">📅 Agendamento</a>
+  <a href="/logout">🚪 Sair</a>
+</div>
 
-<a href="/logout">Sair</a>
+<div class="main">
 
-<hr>
+  <h1>Painel Administrativo</h1>
 
-<h2>Novo Agendamento</h2>
+  <div class="card">
+    <h3>Total de Agendamentos</h3>
+    <h2>{{ agendamentos|length }}</h2>
+  </div>
 
-<form method="POST" action="/agendar">
-  <input type="text" name="nome" placeholder="Nome do cliente" required>
-  <br><br>
+  <div class="card">
+    <h3>Lista de Agendamentos</h3>
 
-  <input type="date" name="data" required>
-  <br><br>
+    <table>
+      <tr>
+        <th>Nome</th>
+        <th>Data</th>
+        <th>Hora</th>
+      </tr>
 
-  <input type="time" name="hora" required>
-  <br><br>
+      {% for a in agendamentos %}
+      <tr>
+        <td>{{ a.nome }}</td>
+        <td>{{ a.data }}</td>
+        <td>{{ a.hora }}</td>
+      </tr>
+      {% endfor %}
 
-  <button type="submit">Agendar</button>
-</form>
+    </table>
 
-<hr>
+  </div>
 
-<h2>Agendamentos</h2>
-
-{% for a in agendamentos %}
-  <p>
-    👤 {{ a.nome }} | 📅 {{ a.data }} | ⏰ {{ a.hora }}
-  </p>
-{% else %}
-  <p>Nenhum agendamento ainda.</p>
-{% endfor %}
+</div>
 
 </body>
 </html>
