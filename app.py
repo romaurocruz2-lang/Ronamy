@@ -3,9 +3,14 @@ from flask import Flask, render_template, request, redirect, session, url_for
 app = Flask(__name__)
 app.secret_key = "chave_super_secreta"
 
-USUARIO_CORRETO = "admin@ronamy.com"
-SENHA_CORRETA = "123"
+# LOGIN FIXO
+USUARIO = "admin@ronamy.com"
+SENHA = "123"
 
+# BANCO SIMPLES EM MEMÓRIA
+agendamentos = []
+
+# ---------- LOGIN ----------
 @app.route("/")
 def home():
     if "logado" in session:
@@ -20,20 +25,41 @@ def login():
         email = request.form.get("email")
         senha = request.form.get("senha")
 
-        if email == USUARIO_CORRETO and senha == SENHA_CORRETA:
+        if email == USUARIO and senha == SENHA:
             session["logado"] = True
             return redirect(url_for("painel"))
         else:
-            erro = "Email ou senha incorretos"
+            erro = "Login inválido"
 
     return render_template("login.html", erro=erro)
 
+# ---------- PAINEL ----------
 @app.route("/painel")
 def painel():
     if "logado" not in session:
         return redirect(url_for("login"))
-    return "<h1>Painel Admin ✔</h1> <a href='/logout'>Sair</a>"
 
+    return render_template("painel.html", agendamentos=agendamentos)
+
+# ---------- NOVO AGENDAMENTO ----------
+@app.route("/agendar", methods=["POST"])
+def agendar():
+    if "logado" not in session:
+        return redirect(url_for("login"))
+
+    nome = request.form.get("nome")
+    data = request.form.get("data")
+    hora = request.form.get("hora")
+
+    agendamentos.append({
+        "nome": nome,
+        "data": data,
+        "hora": hora
+    })
+
+    return redirect(url_for("painel"))
+
+# ---------- LOGOUT ----------
 @app.route("/logout")
 def logout():
     session.pop("logado", None)
