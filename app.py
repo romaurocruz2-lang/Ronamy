@@ -1,49 +1,64 @@
-from flask import Flask, render_template, request, redirect, session, url_for
-import sqlite3
+from flask import Flask, render_template, request, redirect, session, flash
+import psycopg2
+import os
+import bcrypt
+import urllib.parse
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = "saas5_safe_key"
+app.secret_key = "ronamy_secret"
 
-DB = "database.db"
+# ---------------- CONEXÃO POSTGRESQL ----------------
+def get_db():
+    return psycopg2.connect(os.environ["DATABASE_URL"])
 
-# ---------------- BANCO ----------------
+# ---------------- INIT DB ----------------
 def init_db():
-    conn = sqlite3.connect(DB)
+    conn = get_db()
     c = conn.cursor()
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT,
-        password TEXT
+    CREATE TABLE IF NOT EXISTS professionals (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE
     )
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS agendamentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
+    CREATE TABLE IF NOT EXISTS services (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        price TEXT,
+        duration TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS appointments (
+        id SERIAL PRIMARY KEY,
         nome TEXT,
-        data TEXT,
-        hora TEXT,
+        whatsapp TEXT,
         profissional TEXT,
         servico TEXT,
+        data TEXT,
+        hora TEXT,
         status TEXT DEFAULT 'Agendado'
     )
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS profissionais (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT
+    CREATE TABLE IF NOT EXISTS blocked (
+        id SERIAL PRIMARY KEY,
+        profissional TEXT,
+        data TEXT,
+        hora TEXT
     )
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS servicos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        preco TEXT
+    CREATE TABLE IF NOT EXISTS admin (
+        email TEXT,
+        password TEXT
     )
     """)
 
@@ -52,107 +67,164 @@ def init_db():
 
 init_db()
 
-# ---------------- LOGIN SIMPLES (ESTÁVEL) ----------------
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    erro = None
+# ---------------- HORÁRIOS ----------------
+def gerar_horarios():
+    horarios = []
+    inicio = datetime.strptime("08:00", "%H:%M")
+    fim = datetime.strptime("18:00", "%H:%M")
 
-    if request.method == "POST":
-        email = request.form.get("email")
-        senha = request.form.get("senha")
+    while inicio <= fim:
+        horarios.append(inicio.strftime("%H:%M"))
+        inicio += timedelta(minutes=30)
 
-        if email == "admin@ronamy.com" and senha == "123":
-            session["user_id"] = 1
-            return redirect(url_for("painel"))
-        else:
-            erro = "Login inválido"
+    return horarios
 
-    return render_template("login.html", erro=erro)
-
-# ---------------- PAINEL ----------------
-@app.route("/painel")
-def painel():
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    conn = sqlite3.connect(DB)
+# ---------------- HOME ----------------
+@app.route("/", methods=["GET", "POST"])
+def index():
+    conn = get_db()
     c = conn.cursor()
 
-    agendamentos = c.execute("""
-        SELECT id, nome, data, hora, profissional, servico, status
-        FROM agendamentos
-        WHERE user_id=1
-        ORDER BY id DESC
-    """).fetchall()
+    c.execute("SELECT name FROM professionals")
+    professionals = [p[0] for p in c.fetchall()]
 
-    profissionais = c.execute("SELECT nome FROM profissionais").fetchall()
-    servicos = c.execute("SELECT nome, preco FROM servicos").fetchall()
+    c.execute("SELECT name FROM services")
+    services = [s[0] for s in c.fetchall()]
+
+    horarios = gerar_horarios()
+
+    if request.method == "POST":
+        nome = request.form["nome"]
+        whatsapp = request.form["whatsapp"]
+        profissional = request.form["profissional"]
+        servico = request.form["servico"]
+        data = request.form["data"]
+        hora = request.form["hora"]
+
+        c.execute("""
+        SELECT * FROM appointments
+        WHERE profissional=%s AND data=%s AND hora=%s
+        """, (profissional, data, hora))
+        conflict = c.fetchone()
+
+        c.execute("""
+        SELECT * FROM blocked
+        WHERE profissional=%s AND data=%s AND hora=%s
+        """, (profissional, data, hora))
+        blocked = c.fetchone()
+
+        if conflict or blocked:
+            flash("Horário indisponível")
+        else:
+            c.execute("""
+            INSERT INTO appointments (nome, whatsapp, profissional, servico, data, hora)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            """, (nome, whatsapp, profissional, servico, data, hora))
+
+            conn.commit()
+
+            msg = urllib.parse.quote(
+                f"Olá, agendei {servico} com {profissional} no dia {data} às {hora}"
+            )
+
+            link = f"https://wa.me/55{whatsapp}?text={msg}"
+
+            conn.close()
+
+            return render_template(
+                "success.html",
+                nome=nome,
+                profissional=profissional,
+                servico=servico,
+                data=data,
+                hora=hora,
+                link=link
+            )
 
     conn.close()
 
     return render_template(
-        "painel.html",
-        agendamentos=agendamentos,
-        profissionais=profissionais,
-        servicos=servicos
+        "index.html",
+        professionals=professionals,
+        services=services,
+        horarios=horarios
     )
 
-# ---------------- AGENDAR ----------------
-@app.route("/agendar", methods=["POST"])
-def agendar():
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    nome = request.form.get("nome")
-    data = request.form.get("data")
-    hora = request.form.get("hora")
-    profissional = request.form.get("profissional")
-    servico = request.form.get("servico")
-
-    conn = sqlite3.connect(DB)
+# ---------------- LOGIN ----------------
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    conn = get_db()
     c = conn.cursor()
 
-    c.execute("""
-    INSERT INTO agendamentos (user_id, nome, data, hora, profissional, servico)
-    VALUES (1, ?, ?, ?, ?, ?)
-    """, (nome, data, hora, profissional, servico))
+    if request.method == "POST":
+        email = request.form["email"]
+        senha = request.form["senha"].encode()
 
-    conn.commit()
+        c.execute("SELECT * FROM admin WHERE email=%s", (email,))
+        user = c.fetchone()
+
+        if user and bcrypt.checkpw(senha, user[1].encode()):
+            session["admin"] = True
+            return redirect("/dashboard")
+
+        flash("Login inválido")
+
     conn.close()
+    return render_template("login.html")
 
-    return redirect(url_for("painel"))
+# ---------------- DASHBOARD ----------------
+@app.route("/dashboard")
+def dashboard():
+    if not session.get("admin"):
+        return redirect("/admin")
 
-# ---------------- STATUS ----------------
-@app.route("/status/<int:id>/<novo>")
-def status(id, novo):
-    conn = sqlite3.connect(DB)
+    conn = get_db()
     c = conn.cursor()
 
-    c.execute("UPDATE agendamentos SET status=? WHERE id=?", (novo, id))
+    c.execute("SELECT name FROM professionals")
+    professionals = [p[0] for p in c.fetchall()]
 
-    conn.commit()
+    c.execute("SELECT * FROM appointments ORDER BY data, hora")
+    dados = c.fetchall()
+
+    resumo = {}
+    for p in professionals:
+        c.execute("SELECT COUNT(*) FROM appointments WHERE profissional=%s", (p,))
+        resumo[p] = c.fetchone()[0]
+
     conn.close()
 
-    return redirect(url_for("painel"))
+    return render_template(
+        "dashboard.html",
+        dados=dados,
+        professionals=professionals,
+        resumo=resumo
+    )
 
 # ---------------- DELETE ----------------
 @app.route("/delete/<int:id>")
 def delete(id):
-    conn = sqlite3.connect(DB)
+    conn = get_db()
     c = conn.cursor()
 
-    c.execute("DELETE FROM agendamentos WHERE id=?", (id,))
-
+    c.execute("DELETE FROM appointments WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 
-    return redirect(url_for("painel"))
+    return redirect("/dashboard")
 
-# ---------------- LOGOUT ----------------
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
+# ---------------- STATUS ----------------
+@app.route("/status/<int:id>/<novo>")
+def status(id, novo):
+    conn = get_db()
+    c = conn.cursor()
 
+    c.execute("UPDATE appointments SET status=%s WHERE id=%s", (novo, id))
+    conn.commit()
+    conn.close()
+
+    return redirect("/dashboard")
+
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
