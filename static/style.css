@@ -1,76 +1,73 @@
-/* RESET */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: Arial, sans-serif;
-}
-
-/* FUNDO */
 body {
-    background: linear-gradient(135deg, #0f172a, #1e293b);
+    margin: 0;
+    font-family: Arial;
+    background: #0b1220;
     color: white;
 }
 
-/* HEADER */
-header {
-    background: #111827;
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-header h1 {
-    font-size: 20px;
-    color: #38bdf8;
-}
-
-header a {
-    color: white;
-    text-decoration: none;
-    background: #ef4444;
-    padding: 8px 12px;
-    border-radius: 8px;
-}
-
-/* CONTAINER */
-.container {
-    max-width: 1000px;
-    margin: 30px auto;
+/* SIDEBAR */
+.sidebar {
+    width: 220px;
+    height: 100vh;
+    background: #0f172a;
+    position: fixed;
     padding: 20px;
+    border-right: 1px solid #1f2937;
+}
+
+.sidebar h2 {
+    color: #38bdf8;
+    margin-bottom: 30px;
+}
+
+.sidebar a {
+    display: block;
+    color: #cbd5e1;
+    padding: 10px;
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.sidebar a:hover {
+    background: #1e293b;
+}
+
+/* MAIN */
+.main {
+    margin-left: 240px;
+    padding: 20px;
+}
+
+h1 {
+    margin-bottom: 20px;
 }
 
 /* CARD */
 .card {
-    background: #1f2937;
+    background: #111827;
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    border: 1px solid #1f2937;
 }
 
-/* TÍTULOS */
-h2 {
-    margin-bottom: 15px;
-    color: #38bdf8;
-}
-
-/* INPUTS */
-input, select {
+/* INPUT */
+input {
     width: 100%;
     padding: 10px;
-    margin-top: 8px;
-    margin-bottom: 15px;
+    margin: 8px 0;
     border-radius: 8px;
     border: none;
+    background: #0b1220;
+    color: white;
 }
 
 /* BOTÃO */
 button {
     background: #38bdf8;
     color: black;
-    padding: 10px 15px;
+    padding: 10px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -85,22 +82,13 @@ button:hover {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
 }
 
-table th, table td {
+th, td {
     padding: 10px;
-    border-bottom: 1px solid #374151;
-    text-align: left;
+    border-bottom: 1px solid #1f2937;
 }
 
-/* STATUS */
-.status {
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: 12px;
+th {
+    color: #38bdf8;
 }
-
-.agendado { background: #facc15; color: black; }
-.concluido { background: #22c55e; }
-.cancelado { background: #ef4444; }
