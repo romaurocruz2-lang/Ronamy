@@ -11,7 +11,7 @@ def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
 
-    # AGENDAMENTOS (agora SaaS completo)
+    # AGENDAMENTOS
     c.execute("""
     CREATE TABLE IF NOT EXISTS agendamentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +97,7 @@ def login():
 
     return render_template("login.html", erro=erro)
 
-# ---------- PAINEL (SAAS REAL) ----------
+# ---------- PAINEL ----------
 @app.route("/painel")
 def painel():
     if "logado" not in session:
@@ -124,7 +124,7 @@ def painel():
         servicos=servicos
     )
 
-# ---------- AGENDAR (SAAS COMPLETO) ----------
+# ---------- AGENDAR ----------
 @app.route("/agendar", methods=["POST"])
 def agendar():
     if "logado" not in session:
@@ -142,7 +142,6 @@ def agendar():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
 
-    # bloqueio de horário
     conflito = c.execute("""
         SELECT * FROM agendamentos
         WHERE data=? AND hora=? AND profissional=?
