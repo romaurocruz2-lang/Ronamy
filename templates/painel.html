@@ -2,90 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Painel Admin</title>
+<title>Painel Ronamy</title>
 
-<style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #0d0d0d;
-  color: white;
-}
-
-.sidebar {
-  width: 240px;
-  height: 100vh;
-  position: fixed;
-  background: #111;
-  padding: 20px;
-}
-
-.sidebar h2 {
-  color: gold;
-  margin-bottom: 30px;
-}
-
-.sidebar a {
-  display: block;
-  color: #ccc;
-  padding: 10px;
-  text-decoration: none;
-  margin-bottom: 10px;
-  border-radius: 8px;
-}
-
-.sidebar a:hover {
-  background: gold;
-  color: black;
-}
-
-.main {
-  margin-left: 260px;
-  padding: 20px;
-}
-
-.card {
-  background: #1c1c1c;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  box-shadow: 0 0 10px rgba(255,255,255,0.05);
-}
-
-h1 {
-  margin-bottom: 20px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  padding: 12px;
-  border-bottom: 1px solid #333;
-  text-align: left;
-}
-
-th {
-  color: gold;
-}
-
-.badge {
-  background: gold;
-  color: black;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-}
-</style>
-
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
 
 <div class="sidebar">
   <h2>RONAMY</h2>
+
   <a href="/painel">📊 Dashboard</a>
   <a href="/">📅 Agendamento</a>
   <a href="/logout">🚪 Sair</a>
@@ -93,11 +19,24 @@ th {
 
 <div class="main">
 
-  <h1>Painel Administrativo</h1>
+  <h1>Dashboard</h1>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Total de Agendamentos</h3>
+      <p>{{ agendamentos|length }}</p>
+    </div>
+  </div>
 
   <div class="card">
-    <h3>Total de Agendamentos</h3>
-    <h2>{{ agendamentos|length }}</h2>
+    <h3>Novo Agendamento</h3>
+
+    <form method="POST" action="/agendar">
+      <input type="text" name="nome" placeholder="Nome" required>
+      <input type="date" name="data" required>
+      <input type="time" name="hora" required>
+      <button type="submit">Agendar</button>
+    </form>
   </div>
 
   <div class="card">
@@ -112,12 +51,11 @@ th {
 
       {% for a in agendamentos %}
       <tr>
-        <td>{{ a.nome }}</td>
-        <td>{{ a.data }}</td>
-        <td>{{ a.hora }}</td>
+        <td>{{ a[1] }}</td>
+        <td>{{ a[2] }}</td>
+        <td>{{ a[3] }}</td>
       </tr>
       {% endfor %}
-
     </table>
 
   </div>
