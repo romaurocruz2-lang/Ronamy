@@ -32,10 +32,29 @@
     <h3>Novo Agendamento</h3>
 
     <form method="POST" action="/agendar">
+
       <input type="text" name="nome" placeholder="Nome" required>
+
       <input type="date" name="data" required>
+
       <input type="time" name="hora" required>
+
+      <select name="profissional" required>
+        <option value="">Profissional</option>
+        {% for p in profissionais %}
+          <option value="{{ p[0] }}">{{ p[0] }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="servico" required>
+        <option value="">Serviço</option>
+        {% for s in servicos %}
+          <option value="{{ s[0] }}">{{ s[0] }} - R$ {{ s[1] }}</option>
+        {% endfor %}
+      </select>
+
       <button type="submit">Agendar</button>
+
     </form>
   </div>
 
@@ -47,6 +66,8 @@
         <th>Nome</th>
         <th>Data</th>
         <th>Hora</th>
+        <th>Profissional</th>
+        <th>Serviço</th>
       </tr>
 
       {% for a in agendamentos %}
@@ -54,8 +75,11 @@
         <td>{{ a[1] }}</td>
         <td>{{ a[2] }}</td>
         <td>{{ a[3] }}</td>
+        <td>{{ a[4] }}</td>
+        <td>{{ a[5] }}</td>
       </tr>
       {% endfor %}
+
     </table>
 
   </div>
