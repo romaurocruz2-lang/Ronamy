@@ -11,15 +11,26 @@ def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
 
-    # AGENDAMENTOS
+    # USUÁRIOS (SaaS real)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        password TEXT
+    )
+    """)
+
+    # AGENDAMENTOS (multiusuário)
     c.execute("""
     CREATE TABLE IF NOT EXISTS agendamentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
         nome TEXT,
         data TEXT,
         hora TEXT,
         profissional TEXT,
-        servico TEXT
+        servico TEXT,
+        status TEXT DEFAULT 'Agendado'
     )
     """)
 
@@ -69,7 +80,7 @@ def seed_data():
 
 seed_data()
 
-# ---------- LOGIN FIXO ----------
+# ---------- LOGIN FIXO (temporário SaaS 4) ----------
 USUARIO = "admin@ronamy.com"
 SENHA = "123"
 
@@ -91,6 +102,7 @@ def login():
 
         if email == USUARIO and senha == SENHA:
             session["logado"] = True
+            session["user_id"] = 1
             return redirect(url_for("painel"))
         else:
             erro = "Login inválido"
@@ -103,14 +115,17 @@ def painel():
     if "logado" not in session:
         return redirect(url_for("login"))
 
+    user_id = session.get("user_id", 1)
+
     conn = sqlite3.connect(DB)
     c = conn.cursor()
 
     agendamentos = c.execute("""
-        SELECT id, nome, data, hora, profissional, servico
+        SELECT id, nome, data, hora, profissional, servico, status
         FROM agendamentos
+        WHERE user_id=?
         ORDER BY id DESC
-    """).fetchall()
+    """, (user_id,)).fetchall()
 
     profissionais = c.execute("SELECT nome FROM profissionais").fetchall()
     servicos = c.execute("SELECT nome, preco FROM servicos").fetchall()
@@ -130,14 +145,13 @@ def agendar():
     if "logado" not in session:
         return redirect(url_for("login"))
 
+    user_id = session.get("user_id", 1)
+
     nome = request.form.get("nome")
     data = request.form.get("data")
     hora = request.form.get("hora")
     profissional = request.form.get("profissional")
     servico = request.form.get("servico")
-
-    if not nome or not data or not hora:
-        return redirect(url_for("painel"))
 
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -152,9 +166,43 @@ def agendar():
         return redirect(url_for("painel"))
 
     c.execute("""
-    INSERT INTO agendamentos (nome, data, hora, profissional, servico)
-    VALUES (?, ?, ?, ?, ?)
-    """, (nome, data, hora, profissional, servico))
+    INSERT INTO agendamentos (
+        user_id, nome, data, hora, profissional, servico
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, nome, data, hora, profissional, servico))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("painel"))
+
+# ---------- STATUS ----------
+@app.route("/status/<int:id>/<novo>")
+def status(id, novo):
+    if "logado" not in session:
+        return redirect(url_for("login"))
+
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    c.execute("UPDATE agendamentos SET status=? WHERE id=?", (novo, id))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("painel"))
+
+# ---------- DELETE ----------
+@app.route("/delete/<int:id>")
+def delete(id):
+    if "logado" not in session:
+        return redirect(url_for("login"))
+
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    c.execute("DELETE FROM agendamentos WHERE id=?", (id,))
 
     conn.commit()
     conn.close()
