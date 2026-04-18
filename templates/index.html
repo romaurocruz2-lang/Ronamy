@@ -1,131 +1,101 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Ronamy - Agendamento</title>
+  <title>Agendamento Profissional</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
       margin: 0;
-      font-family: Arial;
-      background: #0f0f0f;
-      color: white;
-    }
-
-    .hero {
-      padding: 60px 20px;
-      text-align: center;
-      background: linear-gradient(135deg, #111, #222);
-    }
-
-    .hero h1 {
-      font-size: 40px;
-      margin-bottom: 10px;
-    }
-
-    .hero p {
-      color: #ccc;
-      max-width: 600px;
-      margin: auto;
+      padding: 0;
     }
 
     .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 20px;
-    }
-
-    .card {
-      background: #1c1c1c;
+      max-width: 500px;
+      margin: 40px auto;
+      background: white;
       padding: 20px;
       border-radius: 12px;
-      margin-top: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
 
-    input, select {
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input, select, button {
       width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      margin-bottom: 15px;
+      padding: 12px;
+      margin-top: 10px;
       border-radius: 8px;
-      border: none;
+      border: 1px solid #ccc;
+      font-size: 14px;
     }
 
     button {
-      background: gold;
+      background: #2d6cdf;
+      color: white;
       border: none;
-      padding: 12px;
-      width: 100%;
-      border-radius: 8px;
-      font-weight: bold;
       cursor: pointer;
+      margin-top: 15px;
     }
 
     button:hover {
-      background: #d4af37;
+      background: #1b4fb3;
     }
 
-    .info {
-      text-align: center;
+    label {
+      font-size: 13px;
       margin-top: 10px;
-      color: #aaa;
+      display: block;
     }
   </style>
 </head>
 
 <body>
 
-<div class="hero">
-  <h1>Ronamy</h1>
-  <p>Experiência Premium • Elegância & cuidado para você</p>
-</div>
-
 <div class="container">
+  <h1>Agendar Horário</h1>
 
-  <div class="card">
-    <h2>Agendar Horário</h2>
+  <form method="POST">
 
-    <form method="POST">
+    <label>Nome</label>
+    <input type="text" name="nome" required>
 
-      <label>Nome Completo</label>
-      <input type="text" name="nome" required>
+    <label>WhatsApp</label>
+    <input type="text" name="whatsapp" required>
 
-      <label>WhatsApp</label>
-      <input type="text" name="whatsapp" required>
+    <label>Profissional</label>
+    <select name="profissional" required>
+      {% for p in professionals %}
+        <option value="{{ p[0] }}">{{ p[0] }}</option>
+      {% endfor %}
+    </select>
 
-      <label>Serviço</label>
-      <select name="servico">
-        {% for s in services %}
-        <option value="{{ s }}">{{ s }}</option>
-        {% endfor %}
-      </select>
+    <label>Serviço</label>
+    <select name="servico" required>
+      {% for s in services %}
+        <option value="{{ s[0] }}">{{ s[0] }}</option>
+      {% endfor %}
+    </select>
 
-      <label>Profissional</label>
-      <select name="profissional">
-        {% for p in professionals %}
-        <option value="{{ p }}">{{ p }}</option>
-        {% endfor %}
-      </select>
+    <label>Data</label>
+    <input type="date" name="data" required>
 
-      <label>Data</label>
-      <input type="date" name="data" required>
-
-      <label>Horário</label>
-      <select name="hora">
-        {% for h in horarios %}
+    <label>Horário</label>
+    <select name="hora" required>
+      {% for h in horarios %}
         <option value="{{ h }}">{{ h }}</option>
-        {% endfor %}
-      </select>
+      {% endfor %}
+    </select>
 
-      <button type="submit">Confirmar Reserva</button>
-    </form>
+    <button type="submit">Confirmar Agendamento</button>
 
-    <div class="info">
-      Rua das Acácias, 123 • Ter a Sáb 09h–20h
-    </div>
-
-  </div>
+  </form>
 </div>
 
 </body>
