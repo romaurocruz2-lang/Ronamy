@@ -1,9 +1,8 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import sqlite3
-import bcrypt
 
 app = Flask(__name__)
-app.secret_key = "saas_super_secret"
+app.secret_key = "saas5_safe_key"
 
 DB = "database.db"
 
@@ -15,8 +14,8 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE,
-        password BLOB
+        email TEXT,
+        password TEXT
     )
     """)
 
@@ -53,22 +52,7 @@ def init_db():
 
 init_db()
 
-# ---------------- USUÁRIO TESTE ----------------
-def seed_user():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-
-    if c.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
-        senha = bcrypt.hashpw("123".encode(), bcrypt.gensalt())
-        c.execute("INSERT INTO users (email, password) VALUES (?, ?)",
-                  ("admin@ronamy.com", senha))
-
-    conn.commit()
-    conn.close()
-
-seed_user()
-
-# ---------------- LOGIN ----------------
+# ---------------- LOGIN SIMPLES (ESTÁVEL) ----------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = None
@@ -77,14 +61,8 @@ def login():
         email = request.form.get("email")
         senha = request.form.get("senha")
 
-        conn = sqlite3.connect(DB)
-        c = conn.cursor()
-
-        user = c.execute("SELECT id, password FROM users WHERE email=?", (email,)).fetchone()
-        conn.close()
-
-        if user and bcrypt.checkpw(senha.encode(), user[1]):
-            session["user_id"] = user[0]
+        if email == "admin@ronamy.com" and senha == "123":
+            session["user_id"] = 1
             return redirect(url_for("painel"))
         else:
             erro = "Login inválido"
@@ -103,19 +81,21 @@ def painel():
     agendamentos = c.execute("""
         SELECT id, nome, data, hora, profissional, servico, status
         FROM agendamentos
-        WHERE user_id=?
+        WHERE user_id=1
         ORDER BY id DESC
-    """, (session["user_id"],)).fetchall()
+    """).fetchall()
 
     profissionais = c.execute("SELECT nome FROM profissionais").fetchall()
     servicos = c.execute("SELECT nome, preco FROM servicos").fetchall()
 
     conn.close()
 
-    return render_template("painel.html",
-                           agendamentos=agendamentos,
-                           profissionais=profissionais,
-                           servicos=servicos)
+    return render_template(
+        "painel.html",
+        agendamentos=agendamentos,
+        profissionais=profissionais,
+        servicos=servicos
+    )
 
 # ---------------- AGENDAR ----------------
 @app.route("/agendar", methods=["POST"])
@@ -134,8 +114,8 @@ def agendar():
 
     c.execute("""
     INSERT INTO agendamentos (user_id, nome, data, hora, profissional, servico)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (session["user_id"], nome, data, hora, profissional, servico))
+    VALUES (1, ?, ?, ?, ?, ?)
+    """, (nome, data, hora, profissional, servico))
 
     conn.commit()
     conn.close()
